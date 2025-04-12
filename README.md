@@ -1,5 +1,17 @@
 # repo-to-md
 
+A command-line tool to generate a single Markdown file that concatenates the structure and content of a specified directory. Useful for providing context to Large Language Models (LLMs) or creating simple project documentation.
+
+## Features
+- Recursively scans a directory.
+- Outputs a flat list of files found (using relative paths).
+- Includes the content of text files, formatted with line numbers.
+- Automatically detects and skips likely binary files.
+- Allows ignoring specific directories, files, and extensions via command-line options.
+- Provides sensible default ignores for common development artifacts (e.g., `.git`, `node_modules`, `.pyc`).
+- Output can be directed to stdout (default), a file (`-o`), or the system clipboard (`-c`).
+- Uses `typer` for a user-friendly command-line interface.
+
 ## How to Use
 
 1.  **Install Dependencies:**
@@ -53,13 +65,3 @@
         ./repo_to_md.py --help
         ```
 
-## Features
-
-1.  **Typer Integration:** Uses `typer.Typer()` and `@app.command()` for the CLI structure. Arguments and options are defined using type hints and `typer.Argument`/`typer.Option`. Typer handles help generation, type validation, and default values nicely.
-2.  **Pathlib:** Consistently uses `pathlib.Path` for robust path manipulation. `resolve_path=True` in Typer options ensures absolute paths.
-3.  **Type Hinting:** Uses type hints (`List`, `Optional`, `Set`, `Path`) throughout for clarity and correctness.
-4.  **Specific Ignore Flags:** Implemented `--ignore-dir`, `--ignore-file`, and `--ignore-ext` as requested. These accept multiple values. Default ignore lists are used.
-5.  **Ignoring Logic:** The `os.walk` loop now checks against the provided sets of ignored directories, files, and extensions. Directory ignoring uses the `topdown=True` approach to modify `dirnames` *in place*. Extension checking is case-insensitive and handles leading dots.
-6.  **Error Handling:** Uses `typer.Exit(code=1)` for exiting on errors. Prints error/warning messages to `stderr` using `typer.echo(..., err=True)`. Includes checks for `pyperclip` availability and file I/O errors. File reading uses `errors='ignore'` and catches potential `OSError`.
-7.  **Binary File Handling:** The `is_likely_binary` check remains, using extensions and a null-byte check.
-8.  **Structure Output:** The initial file structure listing is generated during the walk and sorted before being added to the output. The example output format is maintained.
