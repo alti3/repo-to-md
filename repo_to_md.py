@@ -3,7 +3,6 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -229,7 +228,7 @@ def main(
         readable=True,
         resolve_path=True, # Converts to absolute path
     ),
-    output_file: Optional[Path] = typer.Option(
+    output_file: Path | None = typer.Option(
         None, "--output", "-o",
         help="Optional path to write the Markdown output to a file.",
         # Removed writable=True as we create dirs; resolve_path is good
