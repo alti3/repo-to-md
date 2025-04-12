@@ -200,14 +200,16 @@ def generate_markdown(
             # We don't need to re-check ignores here, files were filtered during collection
             file_content_md = format_file_content(file_path, root_dir)
             output_parts.append(file_content_md)
-            # Removed the extra newline here, format_file_content adds separators
+            # Add an extra newline for spacing between file blocks
+            output_parts.append("")
         except Exception as e:
              # Gracefully handle errors for a single file
              typer.echo(f"Warning: Could not process file '{file_path}': {e}", err=True)
 
 
     # Join all parts with a single newline separating them
-    # (structure list, blank line, file1 content, file2 content, ...)
+    # (structure list, blank line, file1 content, "", file2 content, "", ...)
+    # The final .strip() will remove any trailing blank line if needed.
     return "\n".join(output_parts).strip()
 
 
