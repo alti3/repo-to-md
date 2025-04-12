@@ -4,7 +4,7 @@ A command-line tool to generate a single Markdown file that concatenates the str
 
 ## Features
 - Recursively scans a directory.
-- Outputs a flat list of files found (using relative paths).
+- Outputs a tree-like structure of the directory (using relative paths).
 - Includes the content of text files, formatted with line numbers.
 - Automatically detects and skips likely binary files.
 - Allows ignoring specific directories, files, and extensions via command-line options.
