@@ -28,9 +28,17 @@ A command-line tool to generate a single Markdown file that concatenates the str
         ```bash
         ./repo_to_md.py .
         ```
+        or
+        ```bash
+        uvx repo_to_md.py .
+        ```
     *   **Specify Directory:**
         ```bash
         ./repo_to_md.py /path/to/your/project
+        ```
+        or
+        ```bash
+        uvx repo_to_md.py /path/to/your/project
         ```
     *   **Output to File:**
         ```bash
@@ -38,30 +46,61 @@ A command-line tool to generate a single Markdown file that concatenates the str
         # or short form:
         ./repo_to_md.py . -o project_docs.md
         ```
+        or
+        ```bash
+        uvx repo_to_md.py . -o project_docs.md
+        ```
     *   **Output to Clipboard:**
         ```bash
         ./repo_to_md.py . --clipboard
         # or short form:
         ./repo_to_md.py . -c
         ```
+        or
+        ```bash
+        uvx repo_to_md.py . -c
+        ```
     *   **Ignore Specific Directories:** (Uses default ignores + adds `logs` and `temp`)
         ```bash
         ./repo_to_md.py . --ignore-dir logs --ignore-dir temp
+        ```
+        or
+        ```bash
+        uvx repo_to_md.py . --ignore-dir logs --ignore-dir temp
         ```
     *   **Ignore Specific Files:** (Uses default ignores + adds `.env` and `config.json`)
         ```bash
         ./repo_to_md.py . --ignore-file .env --ignore-file config.json
         ```
+        or
+        ```bash
+        uvx repo_to_md.py . --ignore-file .env --ignore-file config.json
+        ```
     *   **Ignore Specific Extensions:** (Uses default ignores + adds `.log` and `.tmp`)
         ```bash
         ./repo_to_md.py . --ignore-ext log --ignore-ext .tmp # Handles leading dot or not
+        ```
+        or
+        ```bash
+        uvx repo_to_md.py . --ignore-ext log --ignore-ext .tmp # Handles leading dot or not
         ```
     *   **Combining Ignores:**
         ```bash
         ./repo_to_md.py . -o out.md --ignore-dir build --ignore-file secrets.txt --ignore-ext bak
         ```
+        or
+        ```bash
+        uvx repo_to_md.py . -o out.md --ignore-dir build --ignore-file secrets.txt --ignore-ext bak
+        ```
     *   **Get Help:**
         ```bash
         ./repo_to_md.py --help
         ```
+        or
+        ```bash
+        uvx repo_to_md.py --help
+        ```
 
+## Contributing
+
+Contributions are welcome! Please see the [CONTRIBUTING.md](CONTRIBUTING.md) file for guidelines.
