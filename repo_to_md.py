@@ -118,69 +118,98 @@ def generate_markdown(
     # Normalize ignore extensions (ensure they start with '.')
     normalized_ignore_exts = { f".{ext.lstrip('.')}".lower() for ext in ignore_exts }
 
+    # --- Collect all files to process recursively (respecting ignores) ---
     for dirpath_str, dirnames, filenames in os.walk(root_dir, topdown=True):
         current_path = Path(dirpath_str)
-        relative_dir_path = current_path.relative_to(root_dir)
 
-        # --- Filtering Logic ---
-        # Filter directories based on ignore patterns in-place
+        # Filter directories based on ignore patterns in-place BEFORE processing files in them
+        # Also filter based on full relative path? No, name check is standard.
+        original_dirnames = list(dirnames) # Copy before modifying
         dirs_to_remove = {
             d for d in dirnames
-            if d in ignore_dirs or (current_path / d) in ignore_dirs # Check full path too? No, simple name check is common
+            if d in ignore_dirs
         }
-        dirnames[:] = [d for d in dirnames if d not in dirs_to_remove] # Modify in-place
+        dirnames[:] = [d for d in dirnames if d not in dirs_to_remove] # Modify in-place for traversal
 
-        # Add current directory to structure (if not root)
-        # depth = len(relative_dir_path.parts)
-        # indent = "  " * depth + "├── " if depth > 0 else ""
-        # if depth > 0: # Don't list the root itself in the structure
-        #     structure_lines.append(f"{indent}/{relative_dir_path.name}/")
-
-        # Process files
-        for filename in sorted(filenames): # Sort files within dir
-            file_full_path = current_path / filename
-            file_ext_lower = file_full_path.suffix.lower()
-
-            # Check ignore conditions
+        # Process files in the *current* directory level of the walk
+        for filename in filenames:
+            # Check if the file itself is ignored by name or extension
             if filename in ignore_files:
                 continue
+            file_full_path = current_path / filename
+            file_ext_lower = file_full_path.suffix.lower()
             if file_ext_lower in normalized_ignore_exts:
                 continue
 
-            # Add to structure list and processing list
-            relative_file_path = file_full_path.relative_to(root_dir)
-            # Use forward slashes for display
-            structure_lines.append(f"└── /{relative_file_path.as_posix()}")
+            # We don't need to check if the *parent* dir was ignored here,
+            # because os.walk(topdown=True) with dirnames[:] modification
+            # prevents entering ignored directories. Files listed here are
+            # guaranteed to be in non-ignored directories.
+
             all_files_to_process.append(file_full_path)
 
-        # Sort dirnames for consistent structure output (optional, but nice)
-        dirnames.sort()
-        for dirname in dirnames:
-             relative_subdir_path = relative_dir_path / dirname
-             structure_lines.append(f"├── /{relative_subdir_path.as_posix()}/")
+
+    # --- Generate the top-level structure list (like tree -L 1) ---
+    try:
+        # List items directly in the root directory
+        root_level_names = sorted(os.listdir(root_dir))
+    except OSError as e:
+        typer.echo(f"Warning: Could not list root directory '{root_dir}': {e}", err=True)
+        root_level_names = []
+
+    items_to_display = []
+    for item_name in root_level_names:
+        item_path = root_dir / item_name
+        is_dir = item_path.is_dir()
+        is_file = item_path.is_file() # Basic check
+
+        # Apply ignore rules to the top-level items
+        if is_dir and item_name in ignore_dirs:
+            continue
+        if is_file and item_name in ignore_files:
+            continue
+        # Check file extension ignore only for files
+        if is_file and item_path.suffix.lower() in normalized_ignore_exts:
+             continue
+
+        # Only add items that are either a directory or a file (skip symlinks etc. for now)
+        if is_dir or is_file:
+             items_to_display.append({"name": item_name, "is_dir": is_dir})
+
+    # Format the structure lines for the filtered top-level items
+    num_items = len(items_to_display)
+    for i, item_info in enumerate(items_to_display):
+        is_last = (i == num_items - 1)
+        prefix = "└── " if is_last else "├── "
+        suffix = "/" if item_info["is_dir"] else ""
+        structure_lines.append(f"{prefix}{item_info['name']}{suffix}")
 
 
     # --- Generate Output String ---
     output_parts: list[str] = []
 
-    # Part 1: The file/directory listing (simplified flat list based on example)
+    # Part 1: The file/directory listing (top level only)
     if structure_lines:
-        output_parts.extend(sorted(structure_lines)) # Sort the final structure list
-        output_parts.append("\n") # Add space before content
+        # Optional: Add root dir name if desired, e.g., output_parts.append(f"{root_dir.name}/")
+        output_parts.extend(structure_lines)
+        output_parts.append("") # Add a blank line for separation before content
 
-    # Part 2: The file contents
-    all_files_to_process.sort() # Sort all collected files by full path
+    # Part 2: The file contents (all collected files from non-ignored dirs)
+    all_files_to_process.sort() # Sort all collected files by full path for consistent order
     for file_path in all_files_to_process:
         try:
+            # We don't need to re-check ignores here, files were filtered during collection
             file_content_md = format_file_content(file_path, root_dir)
             output_parts.append(file_content_md)
-            output_parts.append("\n") # Add space between file blocks
+            # Removed the extra newline here, format_file_content adds separators
         except Exception as e:
              # Gracefully handle errors for a single file
              typer.echo(f"Warning: Could not process file '{file_path}': {e}", err=True)
 
 
-    return "".join(output_parts).strip() # Join all parts
+    # Join all parts with a single newline separating them
+    # (structure list, blank line, file1 content, file2 content, ...)
+    return "\n".join(output_parts).strip()
 
 
 # --- Typer App ---
@@ -203,8 +232,8 @@ def main(
     output_file: Optional[Path] = typer.Option(
         None, "--output", "-o",
         help="Optional path to write the Markdown output to a file.",
-        writable=True,
-        resolve_path=True, # Ensure parent dir exists before write attempt
+        # Removed writable=True as we create dirs; resolve_path is good
+        resolve_path=True,
     ),
     to_clipboard: bool = typer.Option(
         False, "--clipboard", "-c",
@@ -228,9 +257,13 @@ def main(
         help="File extension(s) to ignore (e.g., 'log', '.tmp'). Can be used multiple times.",
          show_default=False,
     ),
+    # Add an option to explicitly include binary files if desired? Maybe later.
+    # Add an option to show full tree structure? Maybe later.
 ):
     """
     Generates Markdown documentation for a repository directory structure and file contents.
+    Outputs a top-level view of the directory structure followed by the contents
+    of all non-ignored files (including those in subdirectories).
     """
     # --- Initial Checks ---
     if to_clipboard and not PYPERCLIP_AVAILABLE:
@@ -238,11 +271,10 @@ def main(
         typer.echo("Install it using: pip install pyperclip", err=True)
         raise typer.Exit(code=1)
 
-    # Combine provided ignores with defaults if needed (Typer handles defaults well)
     # Convert lists to sets for efficient lookup during walk
     ignore_dirs_set = set(ignore_dir)
     ignore_files_set = set(ignore_file)
-    ignore_exts_set = set(ignore_ext)
+    ignore_exts_set = set(ignore_ext) # Extensions passed via CLI
 
     # --- Generate the Markdown ---
     typer.echo(f"Processing directory: {repo_path}", err=True) # Info message to stderr
@@ -251,20 +283,28 @@ def main(
             repo_path,
             ignore_dirs_set,
             ignore_files_set,
-            ignore_exts_set,
+            ignore_exts_set, # Pass CLI ignores here
         )
     except Exception as e:
         typer.echo(f"\nAn unexpected error occurred during Markdown generation: {e}", err=True)
-        # Consider adding more detailed traceback logging here if needed for debugging
+        # import traceback
+        # traceback.print_exc() # Uncomment for detailed debugging
         raise typer.Exit(code=1)
 
     # --- Handle Output ---
+    if not markdown_output:
+        typer.echo("No content generated (perhaps all files were ignored or the directory is empty?).", err=True)
+        raise typer.Exit(code=0) # Exit cleanly if nothing to output
+
     if output_file:
         try:
-            # Ensure parent directory exists
+            # Ensure parent directory exists before opening the file
             output_file.parent.mkdir(parents=True, exist_ok=True)
             with open(output_file, "w", encoding="utf-8") as f:
                 f.write(markdown_output)
+                # Ensure a final newline for POSIX compatibility if file is not empty
+                if markdown_output and not markdown_output.endswith('\n'):
+                     f.write('\n')
             typer.echo(f"Markdown output successfully written to: {output_file}", err=True)
         except IOError as e:
             typer.echo(f"Error: Could not write to output file '{output_file}': {e}", err=True)
@@ -283,6 +323,7 @@ def main(
                  typer.echo("Error: pyperclip not available for clipboard operation.", err=True)
                  raise typer.Exit(code=1)
         except Exception as e: # Catch potential pyperclip errors
+            # Add specific pyperclip exception type if known, e.g., pyperclip.PyperclipException
             typer.echo(f"Error: Could not copy to clipboard: {e}", err=True)
             raise typer.Exit(code=1)
 
@@ -290,13 +331,18 @@ def main(
         # Default to stdout
         try:
             # Use typer.echo to print the final result to stdout
+            # It handles encoding better than print() in some cases
             typer.echo(markdown_output)
+            # Ensure final newline for stdout as well, typer.echo might handle this?
+            # Check if typer.echo adds a newline by default (it usually does).
+            # If markdown_output might be empty, typer.echo('') is fine.
         except Exception as e:
             # This might happen if stdout is closed or has encoding issues
-            typer.echo(f"Error printing output to stdout: {e}", file=sys.stderr)
+            # Using sys.stderr ensures the error message is likely seen
+            typer.echo(f"Error printing output to stdout: {e}", file=sys.stderr, err=True)
             raise typer.Exit(code=1)
 
-    typer.echo("Processing complete.", err=True)
+    # typer.echo("Processing complete.", err=True) # Moved completion message to after successful output
 
 
 if __name__ == "__main__":
